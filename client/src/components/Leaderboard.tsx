@@ -8,7 +8,7 @@ interface LeaderboardProps {
   userId: string | null;
 }
 
-const Leaderboard: React.FC<LeaderboardProps> = ({ userId }) => {
+const Leaderboard: React.FC<LeaderboardProps> = () => {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
