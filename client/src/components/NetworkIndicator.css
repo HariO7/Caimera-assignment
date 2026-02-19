@@ -1,0 +1,47 @@
+.network-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.8rem;
+}
+
+.net-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 500;
+}
+
+.net-status.connected { color: #4ade80; }
+.net-status.connecting { color: #facc15; }
+.net-status.disconnected { color: #f87171; }
+
+.net-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot-green { background: #4ade80; box-shadow: 0 0 6px #4ade80; animation: pulse-green 2s infinite; }
+.dot-yellow { background: #facc15; box-shadow: 0 0 6px #facc15; animation: pulse-yellow 1s infinite; }
+.dot-red { background: #f87171; box-shadow: 0 0 6px #f87171; }
+
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+@keyframes pulse-yellow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.player-count {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-muted);
+}
