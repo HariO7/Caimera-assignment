@@ -2,6 +2,9 @@ import { Server as SocketIOServer } from 'socket.io';
 import db from './db';
 import { generateQuestion, MathQuestion } from './questionGenerator';
 
+const TOTAL_QUESTIONS = 7;
+const NEXT_QUESTION_DELAY_MS = 6000;
+
 interface GameState {
   questionId: number;
   expression: string;
@@ -10,6 +13,8 @@ interface GameState {
   winnerId: string | null;
   winnerName: string | null;
   startedAt: number;
+  questionNumber: number;
+  totalQuestions: number;
 }
 
 interface DbGameState {
@@ -37,7 +42,7 @@ interface LeaderboardRow {
 
 let io: SocketIOServer | null = null;
 let nextQuestionTimer: NodeJS.Timeout | null = null;
-const NEXT_QUESTION_DELAY_MS = 6000; // 6 seconds after winner announced
+let questionCount = 0; // tracks current round within the game
 
 const insertQuestion = db.prepare<[string, number, number]>(
   'INSERT INTO questions (expression, answer, difficulty) VALUES (?, ?, ?)'
@@ -97,6 +102,10 @@ const getLeaderboard = db.prepare<[], LeaderboardRow>(
    LIMIT 10`
 );
 
+const clearAllScores = db.prepare(
+  'DELETE FROM user_scores'
+);
+
 function getCurrentGameStateForClient(): GameState | null {
   const state = getGameState.get() as DbGameState | undefined;
   if (!state || !state.current_question_id) return null;
@@ -112,10 +121,39 @@ function getCurrentGameStateForClient(): GameState | null {
     winnerId: state.winner_id,
     winnerName: state.winner_name,
     startedAt: state.updated_at,
+    questionNumber: questionCount,
+    totalQuestions: TOTAL_QUESTIONS,
   };
 }
 
+function endQuiz(): void {
+  if (!io) return;
+
+  const leaderboard = getLeaderboard.all() as LeaderboardRow[];
+  const winner = leaderboard.length > 0 ? leaderboard[0] : null;
+
+  io.emit('quiz_ended', {
+    winner,
+    leaderboard,
+    totalQuestions: TOTAL_QUESTIONS,
+  });
+
+  // Reset for the next game after a delay
+  setTimeout(() => {
+    clearAllScores.run();
+    questionCount = 0;
+    advanceToNextQuestion();
+  }, 15000); // 15 seconds before the next game auto-starts
+}
+
 function advanceToNextQuestion(): void {
+  questionCount += 1;
+
+  if (questionCount > TOTAL_QUESTIONS) {
+    endQuiz();
+    return;
+  }
+
   const question: MathQuestion = generateQuestion();
 
   const insertResult = insertQuestion.run(
@@ -179,7 +217,7 @@ export function handleSubmitAnswer(
   incrementAttempt.run(userId, username);
 
   const parsedAnswer = parseFloat(String(submittedAnswer));
-  const tolerance = 0.01; // allow small floating point tolerance
+  const tolerance = 0.01;
   const isCorrect = Math.abs(parsedAnswer - question.answer) <= tolerance;
 
   if (!isCorrect) {
@@ -204,14 +242,19 @@ export function handleSubmitAnswer(
       answer: question.answer,
     });
 
-    // Broadcast winner to all other players
+    const isLastQuestion = questionCount >= TOTAL_QUESTIONS;
+
+    // Broadcast winner to all players
     if (io) {
       io.emit('winner_announced', {
         winnerName: username,
         winnerId: userId,
         expression: question.expression,
         answer: question.answer,
-        nextQuestionIn: NEXT_QUESTION_DELAY_MS / 1000,
+        nextQuestionIn: isLastQuestion ? 0 : NEXT_QUESTION_DELAY_MS / 1000,
+        isLastQuestion,
+        questionNumber: questionCount,
+        totalQuestions: TOTAL_QUESTIONS,
       });
 
       // Update leaderboard
@@ -219,7 +262,7 @@ export function handleSubmitAnswer(
       io.emit('leaderboard', leaderboard);
     }
 
-    // Schedule next question
+    // Schedule next question (or end the quiz)
     if (nextQuestionTimer) clearTimeout(nextQuestionTimer);
     nextQuestionTimer = setTimeout(() => {
       advanceToNextQuestion();

@@ -9,6 +9,8 @@ export interface GameState {
   winnerId: string | null;
   winnerName: string | null;
   startedAt: number;
+  questionNumber?: number;
+  totalQuestions?: number;
 }
 
 export interface AnswerResult {
@@ -24,6 +26,9 @@ export interface WinnerAnnouncement {
   expression: string;
   answer: number;
   nextQuestionIn: number;
+  isLastQuestion: boolean;
+  questionNumber: number;
+  totalQuestions: number;
 }
 
 export interface LeaderboardEntry {
@@ -31,6 +36,12 @@ export interface LeaderboardEntry {
   wins: number;
   total_attempts: number;
   last_win_at: number | null;
+}
+
+export interface QuizEndedPayload {
+  winner: LeaderboardEntry | null;
+  leaderboard: LeaderboardEntry[];
+  totalQuestions: number;
 }
 
 type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
@@ -45,6 +56,9 @@ interface UseQuizReturn {
   countdown: number;
   isSubmitting: boolean;
   hasSubmittedThisRound: boolean;
+  quizEnded: QuizEndedPayload | null;
+  questionNumber: number;
+  totalQuestions: number;
   submitAnswer: (answer: string) => void;
   clearResult: () => void;
 }
@@ -59,9 +73,13 @@ export function useQuiz(userId: string | null, username: string | null): UseQuiz
   const [countdown, setCountdown] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmittedThisRound, setHasSubmittedThisRound] = useState(false);
+  const [quizEnded, setQuizEnded] = useState<QuizEndedPayload | null>(null);
+  const [questionNumber, setQuestionNumber] = useState(0);
+  const [totalQuestions, setTotalQuestions] = useState(7);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startCountdown = useCallback((seconds: number) => {
+    if (seconds <= 0) return;
     setCountdown(seconds);
     if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
     countdownTimerRef.current = setInterval(() => {
@@ -76,7 +94,6 @@ export function useQuiz(userId: string | null, username: string | null): UseQuiz
     }, 1000);
   }, []);
 
-  // Re-join on reconnect with same userId for score continuity
   const joinGame = useCallback(() => {
     if (username && userId) {
       socket.emit('join', { username, userId });
@@ -112,6 +129,9 @@ export function useQuiz(userId: string | null, username: string | null): UseQuiz
       setHasSubmittedThisRound(false);
       setIsSubmitting(false);
       setCountdown(0);
+      setQuizEnded(null);
+      if (state.questionNumber !== undefined) setQuestionNumber(state.questionNumber);
+      if (state.totalQuestions !== undefined) setTotalQuestions(state.totalQuestions);
     };
 
     const onAnswerResult = (result: AnswerResult) => {
@@ -124,7 +144,8 @@ export function useQuiz(userId: string | null, username: string | null): UseQuiz
 
     const onWinnerAnnounced = (announcement: WinnerAnnouncement) => {
       setWinnerAnnouncement(announcement);
-      setHasSubmittedThisRound(true);
+      if (announcement.questionNumber !== undefined) setQuestionNumber(announcement.questionNumber);
+      if (announcement.totalQuestions !== undefined) setTotalQuestions(announcement.totalQuestions);
       startCountdown(announcement.nextQuestionIn);
     };
 
@@ -141,6 +162,16 @@ export function useQuiz(userId: string | null, username: string | null): UseQuiz
       setIsSubmitting(false);
     };
 
+    const onQuizEnded = (payload: QuizEndedPayload) => {
+      setQuizEnded(payload);
+      setLeaderboard(payload.leaderboard);
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+      setCountdown(0);
+    };
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('connect_error', onConnectError);
@@ -155,8 +186,8 @@ export function useQuiz(userId: string | null, username: string | null): UseQuiz
     socket.on('leaderboard', onLeaderboard);
     socket.on('player_count', onPlayerCount);
     socket.on('error_msg', onErrorMsg);
+    socket.on('quiz_ended', onQuizEnded);
 
-    // If already connected (re-render), join right away
     if (socket.connected) {
       setConnectionStatus('connected');
       joinGame();
@@ -173,6 +204,7 @@ export function useQuiz(userId: string | null, username: string | null): UseQuiz
       socket.off('leaderboard', onLeaderboard);
       socket.off('player_count', onPlayerCount);
       socket.off('error_msg', onErrorMsg);
+      socket.off('quiz_ended', onQuizEnded);
       if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
     };
   }, [username, userId, joinGame, startCountdown]);
@@ -197,6 +229,9 @@ export function useQuiz(userId: string | null, username: string | null): UseQuiz
     countdown,
     isSubmitting,
     hasSubmittedThisRound,
+    quizEnded,
+    questionNumber,
+    totalQuestions,
     submitAnswer,
     clearResult,
   };

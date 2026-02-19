@@ -26,6 +26,9 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ username, userId }) => {
     countdown,
     isSubmitting,
     hasSubmittedThisRound,
+    quizEnded,
+    questionNumber,
+    totalQuestions,
     submitAnswer,
   } = useQuiz(userId, username);
 
@@ -51,6 +54,62 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ username, userId }) => {
   const isRoundOver = gameState?.status === 'answered' || !!winnerAnnouncement;
   const isInputDisabled = hasSubmittedThisRound || isRoundOver || isSubmitting;
 
+  // ── GAME OVER SCREEN ──────────────────────────────────────────────────────
+  if (quizEnded) {
+    const winner = quizEnded.winner;
+    const isWinner = winner?.username === username;
+    const podium = quizEnded.leaderboard.slice(0, 3);
+    const medals = ['🥇', '🥈', '🥉'];
+
+    return (
+      <div className="quiz-screen quiz-over-screen">
+        <NetworkIndicator status={connectionStatus} playerCount={playerCount} />
+
+        <div className="quiz-over-card">
+          <div className="quiz-over-fireworks">🎊</div>
+          <h1 className="quiz-over-title">Quiz Complete!</h1>
+          <p className="quiz-over-subtitle">{quizEnded.totalQuestions} questions answered</p>
+
+          {winner ? (
+            <div className={`quiz-over-winner-box ${isWinner ? 'winner-box-you' : ''}`}>
+              <div className="quiz-over-trophy">🏆</div>
+              <p className="quiz-over-winner-label">
+                {isWinner ? 'You are the overall winner!' : 'Overall Winner'}
+              </p>
+              <h2 className="quiz-over-winner-name">{winner.username}</h2>
+              <p className="quiz-over-winner-stats">
+                {winner.wins} win{winner.wins !== 1 ? 's' : ''} out of {quizEnded.totalQuestions} rounds
+              </p>
+            </div>
+          ) : (
+            <div className="quiz-over-winner-box">
+              <p className="quiz-over-winner-label">No winners recorded</p>
+            </div>
+          )}
+
+          {podium.length > 0 && (
+            <div className="quiz-over-podium">
+              <h3 className="podium-title">Final Standings</h3>
+              {podium.map((entry, idx) => (
+                <div
+                  key={entry.username}
+                  className={`podium-row ${entry.username === username ? 'podium-row-me' : ''}`}
+                >
+                  <span className="podium-medal">{medals[idx]}</span>
+                  <span className="podium-name">{entry.username}</span>
+                  <span className="podium-wins">{entry.wins} wins</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <p className="quiz-over-next-game">🔄 A new game will start automatically in a few seconds…</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── NORMAL QUIZ SCREEN ────────────────────────────────────────────────────
   return (
     <div className="quiz-screen">
       <NetworkIndicator status={connectionStatus} playerCount={playerCount} />
@@ -89,6 +148,9 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ username, userId }) => {
               <p className="winner-answer">
                 Answer: <strong>{winnerAnnouncement.answer}</strong>
               </p>
+              {winnerAnnouncement.isLastQuestion && (
+                <p className="winner-last-question">🏁 Final question — showing results shortly…</p>
+              )}
             </div>
             {countdown > 0 && (
               <div className="countdown-badge">
@@ -103,7 +165,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ username, userId }) => {
         <div className={`question-card ${isRoundOver ? 'card-dimmed' : ''}`}>
           <div className="question-meta">
             <span className="round-label">
-              Question #{gameState?.questionId ?? '—'}
+              Question {questionNumber > 0 ? `${questionNumber}/${totalQuestions}` : (gameState?.questionId ? `#${gameState.questionId}` : '—')}
             </span>
             {difficulty && (
               <span className="difficulty-badge" style={{ color: difficulty.color, borderColor: difficulty.color }}>
