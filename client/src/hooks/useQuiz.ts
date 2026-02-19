@@ -61,6 +61,7 @@ interface UseQuizReturn {
   totalQuestions: number;
   submitAnswer: (answer: string) => void;
   clearResult: () => void;
+  exitGame: () => void;
 }
 
 export function useQuiz(userId: string | null, username: string | null): UseQuizReturn {
@@ -219,6 +220,11 @@ export function useQuiz(userId: string | null, username: string | null): UseQuiz
     setAnswerResult(null);
   }, []);
 
+  const exitGame = useCallback(() => {
+    socket.emit('player_exit');
+    socket.disconnect();
+  }, []);
+
   return {
     connectionStatus,
     playerCount,
@@ -234,5 +240,6 @@ export function useQuiz(userId: string | null, username: string | null): UseQuiz
     totalQuestions,
     submitAnswer,
     clearResult,
+    exitGame,
   };
 }

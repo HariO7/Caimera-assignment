@@ -4,6 +4,7 @@ import {
   handleSubmitAnswer,
   getCurrentGameStateForClient,
   getLeaderboardData,
+  removeUserScore,
 } from './gameManager';
 
 interface JoinPayload {
@@ -81,10 +82,22 @@ export function setupSocketHandlers(io: SocketIOServer): void {
       socket.emit('leaderboard', getLeaderboardData());
     });
 
+    // Explicit exit: user clicked the exit button
+    socket.on('player_exit', () => {
+      const user = connectedUsers.get(socket.id);
+      if (user) {
+        console.log(`[Socket] ${user.username} (${user.userId}) exited — removing score`);
+        removeUserScore(user.userId);
+        connectedUsers.delete(socket.id);
+      }
+      socket.disconnect(true);
+    });
+
     socket.on('disconnect', (reason) => {
       const user = connectedUsers.get(socket.id);
       if (user) {
-        console.log(`[Socket] ${user.username} disconnected (${reason})`);
+        console.log(`[Socket] ${user.username} disconnected (${reason}) — removing score`);
+        removeUserScore(user.userId);
         connectedUsers.delete(socket.id);
       }
       // Broadcast updated player count after short delay to avoid flicker on reconnect

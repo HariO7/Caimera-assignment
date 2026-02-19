@@ -279,6 +279,10 @@ export function handleSubmitAnswer(
   }
 }
 
+export function removeUserScore(userId: string): void {
+  db.prepare<[string]>('DELETE FROM user_scores WHERE user_id = ?').run(userId);
+}
+
 export function getLeaderboardData(): LeaderboardRow[] {
   return getLeaderboard.all() as LeaderboardRow[];
 }

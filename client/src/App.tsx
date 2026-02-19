@@ -23,6 +23,12 @@ const App: React.FC = () => {
     setUsername(name);
   }, []);
 
+  const handleExit = useCallback(() => {
+    localStorage.removeItem('mathrace_username');
+    localStorage.removeItem('mathrace_user_id');
+    setUsername('');
+  }, []);
+
   const isLoggedIn = Boolean(username);
 
   return (
@@ -40,7 +46,7 @@ const App: React.FC = () => {
           path="/quiz"
           element={
             isLoggedIn
-              ? <QuizScreen username={username} userId={userId} />
+              ? <QuizScreen username={username} userId={userId} onExit={handleExit} />
               : <Navigate to="/" replace />
           }
         />

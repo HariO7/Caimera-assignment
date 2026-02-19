@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import NetworkIndicator from './NetworkIndicator';
 import { useQuiz } from '../hooks/useQuiz';
@@ -7,6 +7,7 @@ import './QuizScreen.css';
 interface QuizScreenProps {
   username: string;
   userId: string;
+  onExit: () => void;
 }
 
 const difficultyLabels: Record<number, { label: string; color: string }> = {
@@ -16,7 +17,7 @@ const difficultyLabels: Record<number, { label: string; color: string }> = {
   4: { label: 'Expert', color: '#f87171' },
 };
 
-const QuizScreen: React.FC<QuizScreenProps> = ({ username, userId }) => {
+const QuizScreen: React.FC<QuizScreenProps> = ({ username, userId, onExit }) => {
   const {
     connectionStatus,
     playerCount,
@@ -30,10 +31,16 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ username, userId }) => {
     questionNumber,
     totalQuestions,
     submitAnswer,
+    exitGame,
   } = useQuiz(userId, username);
 
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const exitQuiz = useCallback(() => {
+    exitGame();
+    onExit();
+  }, [exitGame, onExit]);
 
   // Reset input when a new question arrives
   useEffect(() => {
@@ -104,6 +111,12 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ username, userId }) => {
           )}
 
           <p className="quiz-over-next-game">🔄 A new game will start automatically in a few seconds…</p>
+
+          <div className="quiz-over-actions">
+            <button className="btn-exit-quiz" onClick={exitQuiz}>
+              🚪 Exit
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -122,6 +135,7 @@ const QuizScreen: React.FC<QuizScreenProps> = ({ username, userId }) => {
         <nav className="quiz-nav">
           <span className="greeting">Hi, <strong>{username}</strong></span>
           <Link to="/leaderboard" className="nav-link">🏆 Leaderboard</Link>
+          <button className="btn-exit-nav" onClick={exitQuiz} title="Exit quiz">🚪 Exit</button>
         </nav>
       </header>
 
